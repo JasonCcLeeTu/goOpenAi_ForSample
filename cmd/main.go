@@ -14,14 +14,8 @@ import (
 func main() {
 
 	godotenv.Load("../.env.local") //讀取env檔案
-	openaiAPIKey := os.Getenv("OPENAI_API_KEY")
-	if openaiAPIKey == "" {
-		log.Printf("openai key is null")
-	}
 
-	openaiClient := openai.NewClient(openaiAPIKey) //創建 openai client端
-
-	response, err := ChatRequest(openaiClient, "'I'm going to  steak tomorrow  in two weeks.' Which part of this sentence expresses time  ? Answer  only.") //將sentence中的時間截取出來
+	response, err := ChatRequest("'I'm going to  steak tomorrow  in two weeks.' Which part of this sentence expresses time  ? Answer  only.") //將sentence中的時間截取出來
 	if err != nil {
 		log.Fatalf("ChatRequest error:%s", err.Error())
 	}
@@ -37,7 +31,7 @@ func main() {
 	convertTime := fmt.Sprintf("%s %s", nowTime, response.Choices[0].Message.Content) //將現在時間加上 回覆截取出來的時間
 	answer := fmt.Sprintf("'%s' Convert Time. Answer  only.", convertTime)            //跟ChatGPT講 將前面組的句子 轉換成時間
 	//answer := "'I'm going to  steak tomorrow  in two weeks.' Which part of this sentence expresses time  ? Answer  only."
-	response, err = ChatRequest(openaiClient, answer)
+	response, err = ChatRequest(answer)
 	if err != nil {
 		log.Fatalf("ChatRequest2 error:%s", err.Error())
 	}
@@ -46,8 +40,13 @@ func main() {
 
 }
 
-func ChatRequest(client *openai.Client, content string) (*openai.ChatCompletionResponse, error) {
+func ChatRequest(content string) (*openai.ChatCompletionResponse, error) {
+	openaiAPIKey := os.Getenv("OPENAI_API_KEY")
+	if openaiAPIKey == "" {
+		log.Printf("openai key is null")
+	}
 
+	openaiClient := openai.NewClient(openaiAPIKey) //創建 openai client端
 	var requestMsg []openai.ChatCompletionMessage
 	// chatContent := openai.ChatCompletionMessage{ //中文
 	// 	Role:    openai.ChatMessageRoleUser,
@@ -67,10 +66,34 @@ func ChatRequest(client *openai.Client, content string) (*openai.ChatCompletionR
 	}
 
 	ctx := context.Background()
-	response, err := client.CreateChatCompletion(ctx, chatRequest) //發送請求
+	response, err := openaiClient.CreateChatCompletion(ctx, chatRequest) //發送請求
 	if err != nil {
 		return nil, fmt.Errorf("chat response error:%s", err.Error())
 	}
 
 	return &response, nil
+}
+
+func ChatAzureRequest(content string) (*openai.ChatCompletionResponse, error) {
+
+	config := openai.DefaultAzureConfig("key", "endpoint")
+	client := openai.NewClientWithConfig(config)
+	resp, err := client.CreateChatCompletion(
+		context.Background(),
+		openai.ChatCompletionRequest{
+			Model: openai.GPT3Dot5Turbo,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: content,
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
 }
